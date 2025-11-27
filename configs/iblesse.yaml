@@ -1,0 +1,14 @@
+# configs/example_iblesse.yaml
+
+fastq_dir: "/mnt/evafs/groups/sfglab/jborkowska/OPUS_replication_stress/IBLESS/fastq"
+outdir: "results/iblesse_test"
+
+genome_fasta: "/path/to/genome.fa"
+genome_index: "/path/to/genome/index/prefix"  # bwa index prefix, e.g. /path/to/genome/bwa/genome
+
+sample_pattern: "*_R{1,2}.fastq.gz"
+
+break_calling:
+  mode: "per_base"       # or "binned"
+  bin_size: 1000
+  remove_sgrdi: true
