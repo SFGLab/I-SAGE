@@ -30,21 +30,27 @@ process BREAK_CALLING {
     tag "$sample_id"
 
     input:
-    tuple sample_id, file(bam) from dedup_bam_ch  // <- important
+    tuple sample_id, file(bam) from dedup_bam_ch
 
     output:
     tuple sample_id, file("${sample_id}.breaks.bed") into breaks_ch
 
     script:
+    // Build extra options for SgrDI filtering
+    def extra_opts = ''
+    if( params.break_calling.remove_sgrdi ) {
+        extra_opts = "--remove-sgrdi --reference-fasta ${params.genome_fasta}"
+    }
+
     """
     python ${projectDir}/modules/break_calling/break_caller.py \
         --bam ${bam} \
         --out ${sample_id}.breaks.bed \
         --mode ${params.break_calling.mode} \
-        --bin-size ${params.break_calling.bin_size}
+        --bin-size ${params.break_calling.bin_size} \
+        ${extra_opts}
     """
 }
-
 
 // ---------------------------------------------------------
 // Workflow
