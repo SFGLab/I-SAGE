@@ -1,5 +1,5 @@
 fastq_dir: "/mnt/evafs/groups/sfglab/jborkowska/OPUS_replication_stress/IBLESS/fastq"
-outdir: "results/iblesse_eden_test"
+outdir: "/home2/faculty/pmishra/I-SAGE_Month2"
 
 sample_pattern: "*_R1.fastq.gz"
 
