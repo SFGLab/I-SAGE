@@ -1,11 +1,11 @@
 process FASTQC {
-    tag "${sample_id}"
+    tag "$sample_id"
 
     input:
-    set sample_id, file(reads) from reads_ch
+    tuple sample_id, file(reads)
 
     output:
-    set sample_id, file("*.html"), file("*.zip") into fastqc_results
+    tuple sample_id, file("*.html"), file("*.zip")
 
     script:
     """
