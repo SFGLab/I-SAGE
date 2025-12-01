@@ -34,7 +34,7 @@ process BREAK_CALLING {
     tuple val(sample_id), file(bam)
 
     output:
-    tuple val(sample_id), file("${sample_id}.breaks.bed") into breaks_ch
+    tuple val(sample_id), file("${sample_id}.breaks.bed")
 
     script:
     // Build extra options for SgrDI filtering
