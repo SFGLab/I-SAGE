@@ -11,29 +11,30 @@ include { MARKDUP }     from '../../modules/mapping/markdup.nf'
 include { ALIGN_STATS } from '../../modules/mapping/aln_stats.nf'
 
 
-
 // ---------------------------------------------------------
 // Input channel — SINGLE-END FASTQ FILES
 // ---------------------------------------------------------
 Channel
     .fromPath("${params.fastq_dir}/${params.sample_pattern}")
-    .map { file -> 
+    .map { file ->
         def sample = file.getName().replace("_R1.fastq.gz", "")
         tuple(sample, file)
     }
     .set { reads_ch }
 
+
 // ---------------------------------------------------------
-// Inline Break Calling Process
+// Break Calling Process
 // ---------------------------------------------------------
 process BREAK_CALLING {
     tag "$sample_id"
+    publishDir "${params.outdir}/breaks", mode: 'copy'
 
     input:
-    tuple sample_id, file(bam) from dedup_bam_ch
+    tuple val(sample_id), file(bam)
 
     output:
-    tuple sample_id, file("${sample_id}.breaks.bed") into breaks_ch
+    tuple val(sample_id), file("${sample_id}.breaks.bed") into breaks_ch
 
     script:
     // Build extra options for SgrDI filtering
@@ -52,35 +53,24 @@ process BREAK_CALLING {
     """
 }
 
+
 // ---------------------------------------------------------
 // Workflow
 // ---------------------------------------------------------
 workflow {
 
-    take: reads_ch
+    // 1. QC on raw reads
+    fastqc_out   = FASTQC(reads_ch)
 
-    main:
+    // 2. Mapping (sorted BAM)
+    mapped_bam_ch = ALIGN_BWA(reads_ch)
 
-        // 1. QC on raw reads
-        fastqc_out   = FASTQC(reads_ch)
+    // 3. Deduplication
+    dedup_bam_ch  = MARKDUP(mapped_bam_ch)
 
-        // 2. Mapping (sorted BAM)
-        mapped_bam_ch = ALIGN_BWA(reads_ch)
+    // 4. Alignment stats on deduplicated BAM
+    stats_out     = ALIGN_STATS(dedup_bam_ch)
 
-        // 3. Deduplication
-        dedup_bam_ch  = MARKDUP(mapped_bam_ch)
-
-        // 4. Alignment stats on deduplicated BAM
-        stats_out     = ALIGN_STATS(dedup_bam_ch)
-
-        // 5. Break calling from deduplicated BAM
-        breaks_out    = BREAK_CALLING(dedup_bam_ch)
-
-    emit:
-        fastqc_out
-        mapped_bam_ch
-        dedup_bam_ch
-        stats_out
-        breaks_out
+    // 5. Break calling from deduplicated BAM
+    breaks_out    = BREAK_CALLING(dedup_bam_ch)
 }
-

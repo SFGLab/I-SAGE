@@ -1,11 +1,12 @@
 process ALIGN_BWA {
     tag "$sample_id"
+    publishDir "${params.outdir}/mapping/raw", mode: 'copy'
 
     input:
-    tuple sample_id, file(reads)
+    tuple val(sample_id), file(reads)
 
     output:
-    tuple sample_id, file("${sample_id}.sorted.bam")
+    tuple val(sample_id), file("${sample_id}.sorted.bam")
 
     script:
     """

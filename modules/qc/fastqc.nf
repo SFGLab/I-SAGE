@@ -1,11 +1,12 @@
 process FASTQC {
     tag "$sample_id"
+    publishDir "${params.outdir}/qc/fastqc", mode: 'copy'
 
     input:
-    tuple sample_id, file(reads)
+    tuple val(sample_id), file(reads)
 
     output:
-    tuple sample_id, file("*.html"), file("*.zip")
+    tuple val(sample_id), file("*.html"), file("*.zip")
 
     script:
     """

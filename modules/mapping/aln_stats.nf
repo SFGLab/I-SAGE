@@ -1,11 +1,12 @@
 process ALIGN_STATS {
     tag "$sample_id"
+    publishDir "${params.outdir}/qc/alignment_stats", mode: 'copy'
 
     input:
-    tuple sample_id, file(bam)
+    tuple val(sample_id), file(bam)
 
     output:
-    tuple sample_id, 
+    tuple val(sample_id),
          file("${sample_id}.flagstat.txt"),
          file("${sample_id}.stats.txt")
 

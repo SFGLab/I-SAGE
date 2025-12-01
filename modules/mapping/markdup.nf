@@ -1,15 +1,15 @@
 process MARKDUP {
     tag "$sample_id"
+    publishDir "${params.outdir}/mapping/dedup", mode: 'copy'
 
     input:
-    tuple sample_id, file(bam)
+    tuple val(sample_id), file(bam)
 
     output:
-    tuple sample_id, file("${sample_id}.dedup.bam")
+    tuple val(sample_id), file("${sample_id}.dedup.bam")
 
     script:
     """
-    # Remove duplicates with samtools markdup
     samtools markdup -r ${bam} ${sample_id}.dedup.bam
     samtools index ${sample_id}.dedup.bam
     """
