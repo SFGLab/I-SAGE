@@ -44,7 +44,7 @@ process BREAK_CALLING {
     }
 
     """
-    python ${projectDir}/modules/break_calling/break_caller.py \
+    python ${baseDir}/modules/break_calling/break_caller.py \
         --bam ${bam} \
         --out ${sample_id}.breaks.bed \
         --mode ${params.break_calling.mode} \
@@ -52,7 +52,6 @@ process BREAK_CALLING {
         ${extra_opts}
     """
 }
-
 
 // ---------------------------------------------------------
 // Workflow
