@@ -1,5 +1,6 @@
 fastq_dir: "/mnt/evafs/groups/sfglab/jborkowska/OPUS_replication_stress/IBLESS/fastq"
-outdir: "/home2/faculty/pmishra/I-SAGE_Month2"
+outdir: "/home2/faculty/pmishra/I-SAGE_output"
+logdir: "/home2/faculty/pmishra/I-SAGE_log"
 
 sample_pattern: "*_R1.fastq.gz"
 
@@ -9,4 +10,36 @@ genome_index: "/mnt/evafs/groups/sfglab/jborkowska/hg38/hg38_reference/hg38_refe
 break_calling:
   mode: "per_base"
   bin_size: 1000
-  remove_sgrdi: true  
+  remove_sgrdi: true
+
+viz:
+  enabled: true
+  bin_size: 500
+
+normalization:
+  method: dsb_cpm
+  scale: 1000000
+
+stats:
+  enabled: true
+  contrasts:
+    - name: "HU_vs_H2O_rep3"
+      case: ["GM12878_iBLESS_rep3_HU"]
+      control: ["GM12878_iBLESS_rep3_H2O"]
+
+    - name: "APH_vs_DMSO_rep3"
+      case: ["GM12878_iBLESS_rep3_APH"]
+      control: ["GM12878_iBLESS_rep3_DMSO"]
+
+    - name: "APH_vs_DMSO_rep1"
+      case: ["GM12878_iBLESS_rep1_APH"]
+      control: ["GM12878_iBLESS_rep1_DMSO"]
+
+validation:
+  enabled: true
+  fdr: 0.05
+  downsample_fracs: "1.0,0.5,0.25,0.1"
+  downsample_reps: 1
+  spikein_bins: 1000
+  spikein_mult: 3.0
+  seed: 123
