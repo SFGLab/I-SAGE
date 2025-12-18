@@ -41,7 +41,7 @@ process BREAKS_TO_TRACKS {
     # Input BED columns: chrom start end name score strand
     awk -v OFS='\\t' -v B=${bin_size} '
       {
-        chrom=$1; start=$2; score=$5; strand=$6;
+        chrom=\\$1; start=\\$2; score=\\$5; strand=\\$6;
         binStart = int(start / B) * B;
         key = chrom OFS binStart OFS strand;
         sum[key] += score;
