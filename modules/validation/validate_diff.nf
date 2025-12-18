@@ -6,10 +6,13 @@ process VALIDATE_DIFF {
     tag "${contrast_name}"
     publishDir "${params.outdir}/validation", mode: 'copy'
 
+    /*
+      Accept a SINGLE tuple input per contrast:
+      (samples_tsv, contrast_name, contrast_spec)
+      This allows calling VALIDATE_DIFF(stats_in_ch) once for many contrasts.
+    */
     input:
-    path samples_tsv
-    val contrast_name
-    val contrast_spec
+    tuple path(samples_tsv), val(contrast_name), val(contrast_spec)
 
     output:
     path("${contrast_name}.downsample.tsv")
