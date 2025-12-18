@@ -135,21 +135,32 @@ workflow {
             // contrasts in params.stats.contrasts (list of maps)
             def contrasts = params.stats.contrasts ?: []
 
-            contrasts.each { c ->
-                def cname = c.name as String
-                def case_ids = (c.case as List).join(',')
-                def ctrl_ids = (c.control as List).join(',')
-
-                // expected by scripts: name:CASE1,CASE2:CTRL1,CTRL2
-                def spec = "${cname}:${case_ids}:${ctrl_ids}"
-
-                // Step 3: Differential testing
-                DIFF_BREAKS(samples_tsv_ch, cname, spec)
-
-                // Step 4: Validation (downsampling + spike-in)
-                if ( params.validation?.enabled ) {
-                    VALIDATE_DIFF(samples_tsv_ch, cname, spec)
+            // Build a channel of contrasts: (contrast_name, contrast_spec)
+            contrasts_ch = Channel
+                .fromList(contrasts)
+                .map { c ->
+                    def cname = c.name as String
+                    def case_ids = (c.case as List).join(',')
+                    def ctrl_ids = (c.control as List).join(',')
+                    def spec = "${cname}:${case_ids}:${ctrl_ids}"
+                    tuple(cname, spec)
                 }
+
+            // Pair the single samples TSV with every contrast
+            stats_in_ch = samples_tsv_ch
+                .combine(contrasts_ch)
+                .map { samples_tsv, ctuple ->
+                    def cname = ctuple[0]
+                    def spec  = ctuple[1]
+                    tuple(samples_tsv, cname, spec)
+                }
+
+            // Step 3: Differential testing (one process, many inputs)
+            DIFF_BREAKS(stats_in_ch)
+
+            // Step 4: Validation (one process, many inputs)
+            if ( params.validation?.enabled ) {
+                VALIDATE_DIFF(stats_in_ch)
             }
         }
     }
