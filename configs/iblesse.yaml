@@ -1,6 +1,6 @@
 fastq_dir: "/mnt/evafs_groups/sfglab/jborkowska/OPUS_replication_stress/IBLESS/fastq"
-outdir: "/mnt/evafs_groups/sfglab/pranjul/I-SAGE_output"
-logdir: "/mnt/evafs_groups/sfglab/pranjul/I-SAGE_log"
+outdir: "/home2/faculty/pmishra/I-SAGE_output"
+logdir: "/home2/faculty/pmishra/I-SAGE_log"
 
 sample_pattern: "*_R1.fastq.gz"
 
