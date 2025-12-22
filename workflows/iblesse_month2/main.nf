@@ -1,6 +1,6 @@
 // main.nf
-// I-BLESS Pipeline Month 2 + Month 3 Steps 1–4
-// FASTQ → QC → BAM → Break Calling → bedGraph/bigWig → normalized tracks → differential stats → validation
+// I-BLESS Pipeline Month 2 + Month 3 Steps 1–2 (Visualization + Normalization)
+// FASTQ → QC → BAM → Break Calling → bedGraph/bigWig → normalized tracks
 // ---------------------------------------------------------
 
 nextflow.enable.dsl = 2
@@ -15,10 +15,7 @@ include { ALIGN_STATS } from '../../modules/mapping/aln_stats.nf'
 include { BREAKS_TO_TRACKS; MAKE_IGV_SESSION } from '../../modules/viz/breaks_to_tracks.nf'
 // Month 3 Step 2
 include { NORMALIZE_TRACKS } from '../../modules/viz/normalize_tracks.nf'
-// Month 3 Step 3
 include { DIFF_BREAKS } from '../../modules/stats/diff_breaks.nf'
-// Month 3 Step 4
-include { VALIDATE_DIFF } from '../../modules/validation/validate_diff.nf'
 
 
 // ---------------------------------------------------------
@@ -83,9 +80,7 @@ workflow {
     // 5. Break calling from deduplicated BAM
     breaks_out    = BREAK_CALLING(dedup_bam_ch)
 
-    // ---------------------------------------------------------
-    // Month 3 Step 1 + Step 2 (Visualization + Normalization)
-    // ---------------------------------------------------------
+    // Month 3 Step 1 + Step 2
     if ( params.viz?.enabled ) {
 
         // Step 1: create raw binned bedGraphs + bigWigs + total_dsb.txt
@@ -110,58 +105,5 @@ workflow {
             tuple(sample_id, plus_bg, minus_bg, total_txt)
         }
         norm_tracks_out = NORMALIZE_TRACKS(norm_in, file(params.genome_fasta))
-
-
-        // ---------------------------------------------------------
-        // Month 3 Step 3 + Step 4 (Stats + Validation)
-        // ---------------------------------------------------------
-        if ( params.stats?.enabled ) {
-
-            // Build a samples TSV for the stats/validation scripts:
-            // sample_id <tab> plus.bedGraph <tab> minus.bedGraph
-            // Use RAW binned bedGraphs from Step 1 (tracks_out), not normalized.
-            samples_tsv_ch = tracks_out
-                .map { sample_id, plus_bg, minus_bg, plus_bw, minus_bw, total_txt ->
-                    tuple(sample_id, plus_bg, minus_bg)
-                }
-                .collectFile(
-                    name: "samples_for_stats.tsv",
-                    storeDir: "${params.outdir}/stats",
-                    newLine: true
-                ) { row ->
-                    "${row[0]}\t${row[1]}\t${row[2]}"
-                }
-
-            // contrasts in params.stats.contrasts (list of maps)
-            def contrasts = params.stats.contrasts ?: []
-
-            // Build a channel of contrasts: (contrast_name, contrast_spec)
-            contrasts_ch = Channel
-                .fromList(contrasts)
-                .map { c ->
-                    def cname = c.name as String
-                    def case_ids = (c.case as List).join(',')
-                    def ctrl_ids = (c.control as List).join(',')
-                    def spec = "${cname}:${case_ids}:${ctrl_ids}"
-                    tuple(cname, spec)
-                }
-
-            // Pair the single samples TSV with every contrast
-            stats_in_ch = samples_tsv_ch
-                .combine(contrasts_ch)
-                .map { samples_tsv, ctuple ->
-                    def cname = ctuple[0]
-                    def spec  = ctuple[1]
-                    tuple(samples_tsv, cname, spec)
-                }
-
-            // Step 3: Differential testing (one process, many inputs)
-            DIFF_BREAKS(stats_in_ch)
-
-            // Step 4: Validation (one process, many inputs)
-            if ( params.validation?.enabled ) {
-                VALIDATE_DIFF(stats_in_ch)
-            }
-        }
     }
 }
