@@ -37,25 +37,44 @@ process BREAKS_TO_TRACKS {
     # Total DSB count per sample (sum of column 5)
     awk 'BEGIN{sum=0} !/^#/ {sum += \$5} END{print sum}' "${breaks_bed}" > "${sample_id}.total_dsb.txt"
 
-    # Re-bin counts into fixed windows of size ${bin_size}
+    # Re-bin counts into fixed windows of size ${bin_size} and CLIP binEnd to chromosome length.
     # Input BED columns: chrom start end name score strand
-    awk -v OFS='\t' -v B=${bin_size} '
+    awk -v OFS='\\t' -v B=${bin_size} '
+      NR==FNR { len[\$1]=\$2; next }   # first file = chrom.sizes
       {
         chrom=\$1; start=\$2; score=\$5; strand=\$6;
+
+        # skip chromosomes not present in chrom.sizes
+        if (!(chrom in len)) next;
+
         binStart = int(start / B) * B;
-        key = chrom OFS binStart OFS strand;
+        chromLen = len[chrom];
+
+        # skip bins that start beyond contig length
+        if (binStart >= chromLen) next;
+
+        binEnd = binStart + B;
+        if (binEnd > chromLen) binEnd = chromLen;
+
+        # must have positive width
+        if (binEnd <= binStart) next;
+
+        key = chrom OFS binStart OFS binEnd OFS strand;
         sum[key] += score;
       }
       END {
         for (k in sum) {
           split(k, a, OFS);
-          chrom=a[1]; binStart=a[2]; strand=a[3];
-          binEnd = binStart + B;
+          chrom=a[1]; binStart=a[2]; binEnd=a[3]; strand=a[4];
           if (strand == "+") print chrom, binStart, binEnd, sum[k] > "'"${sample_id}"'.plus.bedGraph";
           else if (strand == "-") print chrom, binStart, binEnd, sum[k] > "'"${sample_id}"'.minus.bedGraph";
         }
       }
-    ' "${breaks_bed}"
+    ' chrom.sizes "${breaks_bed}"
+
+    # Ensure bedGraphs exist even if one strand has zero bins
+    [ -f "${sample_id}.plus.bedGraph" ]  || : > "${sample_id}.plus.bedGraph"
+    [ -f "${sample_id}.minus.bedGraph" ] || : > "${sample_id}.minus.bedGraph"
 
     # Sort bedGraphs (required by bedGraphToBigWig)
     sort -k1,1 -k2,2n "${sample_id}.plus.bedGraph"  -o "${sample_id}.plus.bedGraph"
