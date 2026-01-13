@@ -1,18 +1,20 @@
 // modules/viz/breaks_to_tracks.nf
 // Month 3 Step 1: breaks.bed -> strand bedGraph + bigWig + IGV session
 // (Updated for Step 2: also emits total_dsb.txt)
+// Month 4 update: accept bin_size as an explicit input (supports bin-size sweeps)
 nextflow.enable.dsl = 2
 
 process BREAKS_TO_TRACKS {
-    tag "${sample_id}"
-    publishDir "${params.outdir}/viz/tracks", mode: 'copy'
+    tag "${sample_id} (bin=${bin_size})"
+    publishDir "${params.outdir}/viz/tracks/bin_${bin_size}", mode: 'copy'
 
     input:
-    tuple val(sample_id), path(breaks_bed)
+    tuple val(bin_size), val(sample_id), path(breaks_bed)
     path genome_fasta
 
     output:
-    tuple val(sample_id),
+    tuple val(bin_size),
+          val(sample_id),
           path("${sample_id}.plus.bedGraph"),
           path("${sample_id}.minus.bedGraph"),
           path("${sample_id}.plus.bw"),
@@ -20,7 +22,6 @@ process BREAKS_TO_TRACKS {
           path("${sample_id}.total_dsb.txt")
 
     script:
-    def bin_size = params.viz?.bin_size ?: 500
 
     """
     set -euo pipefail
@@ -87,14 +88,14 @@ process BREAKS_TO_TRACKS {
 }
 
 process MAKE_IGV_SESSION {
-    tag "${sample_id}"
-    publishDir "${params.outdir}/viz/sessions", mode: 'copy'
+    tag "${sample_id} (bin=${bin_size})"
+    publishDir "${params.outdir}/viz/sessions/bin_${bin_size}", mode: 'copy'
 
     input:
-    tuple val(sample_id), path(plus_bw), path(minus_bw)
+    tuple val(bin_size), val(sample_id), path(plus_bw), path(minus_bw)
 
     output:
-    path("${sample_id}.igv_session.xml")
+    tuple val(bin_size), val(sample_id), path("${sample_id}.igv_session.xml")
 
     script:
     """

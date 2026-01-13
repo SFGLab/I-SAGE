@@ -3,18 +3,20 @@
 nextflow.enable.dsl = 2
 
 process NORMALIZE_TRACKS {
-    tag "${sample_id}"
-    publishDir "${params.outdir}/viz/normalized", mode: 'copy'
+    tag "${sample_id} (bin=${bin_size})"
+    publishDir "${params.outdir}/viz/normalized/bin_${bin_size}", mode: 'copy'
 
     input:
-    tuple val(sample_id),
+    tuple val(bin_size),
+          val(sample_id),
           path(plus_bg),
           path(minus_bg),
           path(total_txt)
     path genome_fasta
 
     output:
-    tuple val(sample_id),
+    tuple val(bin_size),
+          val(sample_id),
           path("${sample_id}.plus.norm.bedGraph"),
           path("${sample_id}.minus.norm.bedGraph"),
           path("${sample_id}.plus.norm.bw"),
