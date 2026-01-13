@@ -3,8 +3,8 @@
 nextflow.enable.dsl = 2
 
 process VALIDATE_DIFF {
-    tag "${contrast_name}"
-    publishDir "${params.outdir}/validation", mode: 'copy'
+    tag "${contrast_name} (bin=${bin_size})"
+    publishDir "${params.outdir}/validation/bin_${bin_size}", mode: 'copy'
 
     /*
       Accept a SINGLE tuple input per contrast:
@@ -12,11 +12,12 @@ process VALIDATE_DIFF {
       This allows calling VALIDATE_DIFF(stats_in_ch) once for many contrasts.
     */
     input:
-    tuple path(samples_tsv), val(contrast_name), val(contrast_spec)
+    tuple val(bin_size), path(samples_tsv), val(contrast_name), val(contrast_spec)
 
     output:
     path("${contrast_name}.downsample.tsv")
     path("${contrast_name}.downsample.png")
+    path("${contrast_name}.downsample.pdf")
     path("${contrast_name}.spikein.tsv")
     path("${contrast_name}.validation.summary.txt")
 
@@ -27,11 +28,13 @@ process VALIDATE_DIFF {
     def spike_bins = params.validation?.spikein_bins ?: 1000
     def spike_mult = params.validation?.spikein_mult ?: 3.0
     def seed = params.validation?.seed ?: 123
+    def regions_bed = params.stats?.regions_bed
+    def regions_arg = regions_bed ? "--regions-bed ${regions_bed}" : ""
 
     """
     set -euo pipefail
 
-    python ${projectDir}/../../modules/validation/validate_diff.py \
+    python ${projectDir}/modules/validation/validate_diff.py \
       --samples-tsv ${samples_tsv} \
       --contrast "${contrast_spec}" \
       --out-prefix ${contrast_name} \
@@ -40,6 +43,7 @@ process VALIDATE_DIFF {
       --downsample-reps ${reps} \
       --spikein-bins ${spike_bins} \
       --spikein-mult ${spike_mult} \
-      --seed ${seed}
+      --seed ${seed} \
+      ${regions_arg}
     """
 }
