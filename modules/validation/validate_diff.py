@@ -15,6 +15,51 @@ import matplotlib.pyplot as plt
 from scipy.stats import fisher_exact
 
 
+def read_bed_regions(path: str) -> Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray]]:
+    """Read BED (chrom, start, end) and build per-chrom interval index."""
+    bed = pd.read_csv(
+        path,
+        sep="\t",
+        header=None,
+        comment="#",
+        usecols=[0, 1, 2],
+        names=["chrom", "start", "end"],
+        dtype={"chrom": str, "start": np.int64, "end": np.int64},
+    )
+    bed = bed.dropna()
+    bed = bed[bed["end"] > bed["start"]]
+
+    out: Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray]] = {}
+    for chrom, sub in bed.groupby("chrom", sort=False):
+        sub = sub.sort_values("start", kind="mergesort")
+        starts = sub["start"].to_numpy(dtype=np.int64)
+        ends = sub["end"].to_numpy(dtype=np.int64)
+        prefix_max_end = np.maximum.accumulate(ends)
+        out[str(chrom)] = (starts, ends, prefix_max_end)
+    return out
+
+
+def bins_overlap_regions(
+    bins: pd.DataFrame,
+    regions: Dict[str, Tuple[np.ndarray, np.ndarray, np.ndarray]],
+) -> np.ndarray:
+    """Return boolean mask of bins overlapping any region in BED."""
+    mask = np.zeros(len(bins), dtype=bool)
+    for chrom, idx in bins.groupby("chrom").groups.items():
+        key = str(chrom)
+        if key not in regions:
+            continue
+        starts, _ends, prefix_max_end = regions[key]
+        s = bins.loc[idx, "start"].to_numpy(dtype=np.int64)
+        e = bins.loc[idx, "end"].to_numpy(dtype=np.int64)
+        j = np.searchsorted(starts, e, side="right") - 1
+        ok = j >= 0
+        over = np.zeros_like(ok, dtype=bool)
+        over[ok] = prefix_max_end[j[ok]] > s[ok]
+        mask[idx] = over
+    return mask
+
+
 def read_bedgraph(path: str) -> pd.DataFrame:
     return pd.read_csv(
         path,
@@ -209,6 +254,11 @@ def main() -> None:
     ap.add_argument("--spikein-bins", type=int, default=1000)
     ap.add_argument("--spikein-mult", type=float, default=3.0)
     ap.add_argument("--seed", type=int, default=123)
+    ap.add_argument(
+        "--regions-bed",
+        default=None,
+        help="Optional BED file. If provided, validation operates only on bins overlapping these regions.",
+    )
     args = ap.parse_args()
 
     cname, case_ids, ctrl_ids = parse_contrast(args.contrast)
@@ -224,6 +274,14 @@ def main() -> None:
     base = case_df.merge(ctrl_df, on=["chrom", "start", "end"], how="outer")
     base["count_case"] = base["count_case"].fillna(0.0)
     base["count_ctrl"] = base["count_ctrl"].fillna(0.0)
+
+    regions_bed = str(args.regions_bed) if args.regions_bed else None
+    if regions_bed:
+        regions = read_bed_regions(regions_bed)
+        keep = bins_overlap_regions(base[["chrom", "start", "end"]], regions)
+        base = base.loc[keep].reset_index(drop=True)
+        if len(base) == 0:
+            raise SystemExit(f"ERROR: No bins overlap regions BED: {regions_bed}")
 
     fracs = [float(x) for x in args.downsample_fracs.split(",") if x.strip()]
 
@@ -245,11 +303,13 @@ def main() -> None:
 
     with open(f"{args.out_prefix}.validation.summary.txt", "w") as f:
         f.write(f"contrast\t{cname}\n")
+        f.write(f"regions_bed\t{regions_bed if regions_bed else 'NA'}\n")
         f.write(f"fdr\t{args.fdr}\n")
         f.write(f"downsample_fracs\t{args.downsample_fracs}\n")
         f.write(f"downsample_reps\t{args.downsample_reps}\n")
         f.write(f"spikein_bins\t{args.spikein_bins}\n")
         f.write(f"spikein_mult\t{args.spikein_mult}\n")
+        f.write(f"regions_bed\t{regions_bed if regions_bed else 'NA'}\n")
 
 
 if __name__ == "__main__":
