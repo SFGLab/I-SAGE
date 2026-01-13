@@ -14,7 +14,7 @@ break_calling:
 
 viz:
   enabled: true
-  bin_size: 500
+  bin_sizes: [250, 500, 1000]
 
 normalization:
   method: dsb_cpm
@@ -22,18 +22,24 @@ normalization:
 
 stats:
   enabled: true
+  ebv_regex: "(?i)^chrEBV$"
+  fdr: 0.05
+  replicate_method: meta_fisher   # or pooled
+
+  conditions:
+    APH:  ["GM12878_iBLESS_rep1_APH", "GM12878_iBLESS_rep3_APH"]
+    DMSO: ["GM12878_iBLESS_rep1_DMSO", "GM12878_iBLESS_rep3_DMSO"]
+    HU:   ["GM12878_iBLESS_rep3_HU"]
+    H2O:  ["GM12878_iBLESS_rep3_H2O"]
+
   contrasts:
+    - name: "APH_vs_DMSO"
+      case_condition: "APH"
+      control_condition: "DMSO"
+
     - name: "HU_vs_H2O_rep3"
-      case: ["GM12878_iBLESS_rep3_HU"]
-      control: ["GM12878_iBLESS_rep3_H2O"]
-
-    - name: "APH_vs_DMSO_rep3"
-      case: ["GM12878_iBLESS_rep3_APH"]
-      control: ["GM12878_iBLESS_rep3_DMSO"]
-
-    - name: "APH_vs_DMSO_rep1"
-      case: ["GM12878_iBLESS_rep1_APH"]
-      control: ["GM12878_iBLESS_rep1_DMSO"]
+      case_condition: "HU"
+      control_condition: "H2O"
 
 validation:
   enabled: true
