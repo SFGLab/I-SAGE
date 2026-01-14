@@ -1,7 +1,3 @@
-# 2️⃣ `CODE_OF_CONDUCT.md`
-
-Use a **standard, non-dramatic** code of conduct. This is not about virtue signaling; it’s about professionalism.
-
 ```markdown
 # Code of Conduct
 
