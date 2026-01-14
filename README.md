@@ -196,6 +196,11 @@ Full documentation is under development and will be available in the `documentat
 
 ---
 
+## Citation / Acknowledgment
+
+If this tool supports your work, please cite the repository and acknowledge:
+**“Developed by Pranjul Mishra, under the guidance of Dr. Joanna Borkowska and Prof. Dariusz Plewczyński (Structural and Functional Genomics Laboratory).”**
+
 ## License
 
 This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
