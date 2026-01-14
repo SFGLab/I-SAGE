@@ -1,0 +1,18 @@
+site_name: I-SAGE Documentation
+site_description: iBLESS analysis pipeline documentation
+repo_url: https://github.com/SFGLab/I-SAGE
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.sections
+    - search.suggest
+    - content.code.copy
+nav:
+  - Home: index.md
+  - Getting Started: getting_started.md
+  - Configuration: configuration.md
+  - Pipeline Modules: pipeline_modules.md
+  - Statistical Methods: statistical_methods.md
+  - Outputs: outputs.md
+  - Developer Guide: developers_guide.md
