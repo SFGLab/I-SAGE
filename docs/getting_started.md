@@ -42,7 +42,6 @@ All plotting is headless-safe (no GUI required).
 After cloning the repository, the main structure is:
 
 ```
-
 I-SAGE/
 ├── workflows/
 │   └── iblesse_month2/
@@ -57,7 +56,6 @@ I-SAGE/
 ├── documentation/
 ├── README.md
 └── nextflow.config
-
 ````
 
 You will typically only modify:
