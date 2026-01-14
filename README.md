@@ -36,6 +36,23 @@ The pipeline integrates alignment, break calling, normalization, visualization, 
 
 ---
 
+## Documentation
+[![Documentation](https://img.shields.io/badge/docs-online-blue)](https://sfglab.github.io/I-SAGE/)
+
+The full documentation for **I-SAGE** is available as a hosted website:
+
+👉 **https://sfglab.github.io/I-SAGE/**
+
+The documentation includes:
+- Getting started guide
+- Full configuration reference
+- Pipeline module descriptions
+- Statistical methods and assumptions
+- Output interpretation
+- Developer and contribution guidelines
+
+
+
 ## Pipeline Overview
 
 ```
