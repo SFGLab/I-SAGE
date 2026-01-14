@@ -1,36 +1,35 @@
 # Developer Guide
 
-Purpose
-- Reference for developers and maintainers of the I-SAGE pipeline.
-- Documents design principles, code layout, statistical choices, extension points, and testing expectations.
+## Overview
 
-Table of contents
-1. Design philosophy
-2. Code organization
-3. Why Nextflow
-4. Statistical decisions
-5. Replicate handling
-6. Bin-size policy
-7. EBV annotation
-8. Region-restricted testing
-9. Validation
-10. Adding a module
-11. Testing & release checklist
-12. When to say no
-13. Contact
+This guide is a reference for developers and maintainers of the I-SAGE pipeline. It documents design principles, code layout, statistical choices, extension points, and testing expectations.
 
----
+## Table of Contents
 
-## 1. Design philosophy
+1. [Design Philosophy](#design-philosophy)
+2. [Code Organization](#code-organization)
+3. [Why Nextflow](#why-nextflow)
+4. [Statistical Decisions](#statistical-decisions)
+5. [Replicate Handling](#replicate-handling)
+6. [Bin-Size Policy](#bin-size-policy)
+7. [EBV Annotation](#ebv-annotation)
+8. [Region-Restricted Testing](#region-restricted-testing)
+9. [Validation](#validation)
+10. [Adding a Module](#adding-a-module)
+11. [Testing & Release Checklist](#testing--release-checklist)
+12. [When to Say No](#when-to-say-no)
+13. [Contact & Maintainers](#contact--maintainers)
+
+## Design Philosophy
+
 Principles that should guide all development:
-- Reproducibility over convenience
-- Transparency and interpretability over black-box methods
-- Modularity: each stage is a self-contained, reviewable unit
-- Explicit assumptions documented alongside code
 
----
+- **Reproducibility over convenience** — All results must be fully reproducible
+- **Transparency and interpretability over black-box methods** — Users must understand what happened
+- **Modularity** — Each stage is a self-contained, reviewable unit
+- **Explicit assumptions** — Document assumptions alongside code
 
-## 2. Code organization
+## Code Organization
 
 Recommended repository layout:
 
@@ -44,133 +43,123 @@ modules/
   stats/
   validation/
 configs/
-documentation/
+docs/
 ```
 
 Guidelines:
-- main.nf orchestrates processes and propagates parameters.
-- Each directory in modules/ implements a single conceptual stage with explicit inputs/outputs.
-- Statistical and validation logic lives in Python scripts under modules/ with unit tests.
 
----
+- `main.nf` orchestrates processes and propagates parameters
+- Each directory in `modules/` implements a single conceptual stage with explicit inputs/outputs
+- Statistical and validation logic lives in Python scripts under `modules/` with unit tests
 
-## 3. Why Nextflow
-Rationale:
-- Reproducible execution on local and HPC environments
-- Clear separation of workflow logic and tool implementation
-- Built-in caching, provenance, and traceability
-
-Do not bypass Nextflow by embedding execution logic in ad-hoc scripts.
-
----
-
-## 4. Statistical decisions
-
-Primary choices:
-- Per-bin Fisher exact test for differential break counts
-- Benjamini–Hochberg FDR for multiple-testing correction
+## Why Nextflow
 
 Rationale:
-- iBLESS counts are sparse; many bins have low/zero counts
-- Fisher's test is exact and assumption-light, hence interpretable and robust for sparse data
 
-Document any deviation from this approach with motivation and tests demonstrating improved behaviour.
+- **Reproducible execution** — Works on local and HPC environments
+- **Clear separation** — Workflow logic distinct from tool implementation
+- **Built-in features** — Caching, provenance, and traceability
 
----
+**Important:** Do not bypass Nextflow by embedding execution logic in ad-hoc scripts.
 
-## 5. Replicate handling
+## Statistical Decisions
 
-Supported strategies:
-- pooled: sum counts across replicates
-- meta_fisher: combine per-replicate p-values via Fisher's method
+### Primary Choices
 
-Rationale:
+- **Per-bin Fisher exact test** for differential break counts
+- **Benjamini–Hochberg FDR** for multiple-testing correction
+
+### Rationale
+
+- iBLESS counts are sparse; many bins have low or zero counts
+- Fisher's test is exact and assumption-light, making it interpretable and robust for sparse data
+
+**Note:** Document any deviation from this approach with motivation and tests demonstrating improved behavior.
+
+## Replicate Handling
+
+### Supported Strategies
+
+- **`pooled`** — Sum counts across replicates
+- **`meta_fisher`** — Combine per-replicate p-values via Fisher's method
+
+### Rationale
+
 - Avoids fitting unstable dispersion models with few replicates
 - Keeps analysis conservative and interpretable
 
-If introducing GLMs or shrinkage estimators, include benchmarks and documented justification.
+**Note:** If introducing GLMs or shrinkage estimators, include benchmarks and documented justification.
 
----
+## Bin-Size Policy
 
-## 6. Bin-size policy
-
-- Treat bin size as an explicit parameter (biological and statistical).
-- Support bin-size sweeps to assess sensitivity.
-- Avoid hardcoded single-bin assumptions in downstream logic.
+- Treat bin size as an explicit parameter (biological and statistical)
+- Support bin-size sweeps to assess sensitivity
+- Avoid hardcoded single-bin assumptions in downstream logic
 
 Provide scripts to aggregate and summarize results across bin sizes when adding new modules.
 
----
+## EBV Annotation
 
-## 7. EBV annotation
+- EBV support is **optional and opt-in** via configuration (e.g., `stats.ebv_regex`)
+- EBV is used for **annotation and enrichment reporting**, not for filtering or mechanistic claims
+- When EBV is enabled, include clear reporting on how EBV bins were identified
 
-- EBV support is optional and opt-in via configuration (e.g., stats.ebv_regex).
-- EBV is used for annotation and enrichment reporting, not for filtering or mechanistic claims.
-- When EBV is enabled, include clear reporting on how EBV bins were identified.
+## Region-Restricted Testing
 
----
+- Region restriction narrows the tested universe and recomputes totals within that universe
+- Distinguish region-restricted testing from post-hoc enrichment or overlap analyses in documentation and UIs
 
-## 8. Region-restricted testing
-
-- Region restriction narrows the tested universe and recomputes totals within that universe.
-- Distinguish region-restricted testing from post-hoc enrichment or overlap analyses in docs and UIs.
-
----
-
-## 9. Validation
+## Validation
 
 Built-in validation strategies:
-- Downsampling experiments
-- Spike-in recovery tests
-- Bin-size sensitivity analysis
 
-Validation outputs are diagnostic; they inform interpretation but should not be used to automatically filter results without explicit justification.
+- **Downsampling experiments** — Assess robustness with reduced data
+- **Spike-in recovery tests** — Validate detection sensitivity
+- **Bin-size sensitivity analysis** — Understand parameter sensitivity
 
----
+**Important:** Validation outputs are diagnostic; they inform interpretation but should not be used to automatically filter results without explicit justification.
 
-## 10. Adding a module
+## Adding a Module
 
-Steps:
-1. Define scientific purpose and acceptance criteria.
-2. Implement the process under modules/<name>/ with clear inputs/outputs.
-3. Add or update unit tests and example data.
-4. Wire the process in main.nf with configuration knobs.
-5. Document module in documentation/pipeline_modules.md and update configs example.
-6. Run the integration test (small dataset) and add to CI if applicable.
+Follow these steps:
 
-Merge only if documentation and tests are present.
+1. Define scientific purpose and acceptance criteria
+2. Implement the process under `modules/<name>/` with clear inputs/outputs
+3. Add or update unit tests and example data
+4. Wire the process in `main.nf` with configuration knobs
+5. Document module in [Pipeline Modules](pipeline_modules.md) and update config example
+6. Run integration test (small dataset) and add to CI if applicable
 
----
+**Merge condition:** Documentation and tests must be present before merging.
 
-## 11. Testing & release checklist
+## Testing & Release Checklist
 
 Before merging:
-- Run pipeline on a small, representative dataset.
-- Confirm outputs match expectations and reproducibility (same inputs → same outputs).
-- Update documentation for any user-facing or config changes.
-- Add/adjust unit tests and integration tests.
-- Record changes in CHANGELOG.md.
 
----
+- [ ] Run pipeline on a small, representative dataset
+- [ ] Confirm outputs match expectations and reproducibility (same inputs → same outputs)
+- [ ] Update documentation for any user-facing or config changes
+- [ ] Add/adjust unit tests and integration tests
+- [ ] Record changes in CHANGELOG.md
 
-## 12. When to say no
+## When to Say No
 
 Reject changes that:
+
 - Add complexity without biological benefit
 - Introduce opaque statistical methods without documentation and tests
 - Encourage overfitting or p-hacking through undocumented parameters
 
-Prefer conservative, explainable solutions.
+**Philosophy:** Prefer conservative, explainable solutions.
 
----
+## Contact & Maintainers
 
-## 13. Contact / Maintainers
+**Primary Maintainer:** Pranjul Mishra
 
-Primary maintainer: Pranjul Mishra  
-Supervisors: Dr. Joanna Borkowska, Prof. Dariusz Plewczyński
+**Supervisors:** Dr. Joanna Borkowska, Prof. Dariusz Plewczyński
 
 For design decisions, open an issue and tag the maintainers. Include rationale, tests, and example outputs.
 
 ---
-<!-- End of developer guide -->
 
+**See Also:** [Contributing Guidelines](../CONTRIBUTING.md) | [Code of Conduct](../CODE_OF_CONDUCT.md)

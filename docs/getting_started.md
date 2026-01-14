@@ -1,23 +1,27 @@
-```markdown
 # Getting Started with I-SAGE
 
 This section explains how to set up and run the I-SAGE pipeline, from environment requirements to executing a first analysis.
 
-I-SAGE is designed primarily for **HPC environments** and assumes familiarity with command-line tools and batch systems (e.g. SLURM).
-
----
+I-SAGE is designed primarily for **HPC environments** and assumes familiarity with command-line tools and batch systems (e.g., SLURM).
 
 ## System Requirements
 
 ### Software
 
-- **Nextflow** ≥ 22.x  
-- **Java** ≥ 11  
-- **Python** ≥ 3.9  
+- **Nextflow** ≥ 22.x
+- **Java** ≥ 11
+- **Python** ≥ 3.9
+- **Bash / core UNIX utilities**
 
 Nextflow manages workflow execution and logging; Python scripts implement statistical and validation logic.
 
----
+### Bioinformatics Tools
+The following tools must be available in the execution environment (typically via modules or Conda):
+
+- **samtools** — BAM processing, sorting, indexing
+- **pysam** — Python bindings for BAM/CRAM access
+- **bwa** (or equivalent aligner) — read alignment
+- **bedGraph / UCSC utilities** — bedGraph and bigWig handling
 
 ### Python Dependencies
 
@@ -29,13 +33,15 @@ The following Python packages are required:
 - `matplotlib`
 
 These are typically provided via:
-- a Conda environment
-- a system-wide Python installation
-- or an HPC module
+- A Conda environment
+- A system-wide Python installation
+- An HPC module
 
 All plotting is headless-safe (no GUI required).
 
----
+> **Note:**  
+> I-SAGE assumes these tools are provided by the execution environment (HPC modules, Conda, or container).  
+> The pipeline does not install system-level dependencies automatically.
 
 ## Repository Structure
 
@@ -53,17 +59,15 @@ I-SAGE/
 │   └── break_calling/
 ├── configs/
 │   └── iblesse.yaml
-├── documentation/
+├── docs/
 ├── README.md
 └── nextflow.config
-````
+```
 
 You will typically only modify:
 - `configs/iblesse.yaml`
 - SLURM submission scripts
-- (optionally) Nextflow profiles
-
----
+- (Optionally) Nextflow profiles
 
 ## Input Data Requirements
 
@@ -76,16 +80,14 @@ You will typically only modify:
 Example:
 ```yaml
 sample_pattern: "*_R1.fastq.gz"
-````
-
----
+```
 
 ### Reference Genome
 
 You must provide:
 
-* a reference genome FASTA
-* an index compatible with the aligner used in the pipeline
+- A reference genome FASTA
+- An index compatible with the aligner used in the pipeline
 
 Example:
 
@@ -94,9 +96,7 @@ genome_fasta: "/path/to/hg38_reference.fna"
 genome_index: "/path/to/hg38_reference.fna"
 ```
 
-If EBV contigs are included (e.g. `chrEBV`), EBV-specific analyses can be enabled.
-
----
+If EBV contigs are included (e.g., `chrEBV`), EBV-specific analyses can be enabled.
 
 ## Configuration File (`iblesse.yaml`)
 
@@ -104,16 +104,13 @@ All pipeline behavior is controlled via a single YAML file.
 
 Key sections include:
 
-* `break_calling`
-* `viz`
-* `normalization`
-* `stats`
-* `validation`
+- `break_calling`
+- `viz`
+- `normalization`
+- `stats`
+- `validation`
 
-A fully working example is provided in `configs/iblesse.yaml`.
-Detailed explanations are provided in the **Configuration Guide** section of the documentation.
-
----
+A fully working example is provided in `configs/iblesse.yaml`. Detailed explanations are provided in the **Configuration Guide** section of the documentation.
 
 ## Running the Pipeline
 
@@ -129,11 +126,9 @@ nextflow run workflows/iblesse_month2/main.nf \
 
 This will:
 
-* read FASTQ files
-* execute all enabled pipeline stages
-* write results to the directory specified by `outdir`
-
----
+- Read FASTQ files
+- Execute all enabled pipeline stages
+- Write results to the directory specified by `outdir`
 
 ### Running on an HPC Cluster (SLURM)
 
@@ -151,57 +146,49 @@ Example (simplified):
 sbatch run_isage.slurm
 ```
 
-Within the SLURM script, Nextflow is executed normally.
-Nextflow parallelizes tasks within the allocated resources.
-
----
+Within the SLURM script, Nextflow is executed normally. Nextflow parallelizes tasks within the allocated resources.
 
 ## Execution Outputs
 
 During and after execution, I-SAGE produces:
 
-* **Nextflow report** (`report_*.html`)
-* **Execution trace** (`trace_*.txt`)
-* **Timeline view** (`timeline_*.html`)
-* Structured output directories:
-
-  * `viz/`
-  * `stats/`
-  * `validation/`
+- **Nextflow report** (`report_*.html`)
+- **Execution trace** (`trace_*.txt`)
+- **Timeline view** (`timeline_*.html`)
+- Structured output directories:
+  - `viz/`
+  - `stats/`
+  - `validation/`
 
 These files are critical for debugging and reproducibility.
-
----
 
 ## First-Time Run Checklist
 
 Before running a full analysis, verify:
 
-* FASTQ paths are correct
-* Reference genome paths exist
-* Output and log directories are writable
-* The selected Nextflow profile matches your environment
-* Bin sizes and contrasts are intentional (not defaults by accident)
-
----
+- FASTQ paths are correct
+- Reference genome paths exist
+- Output and log directories are writable
+- The selected Nextflow profile matches your environment
+- Bin sizes and contrasts are intentional (not defaults by accident)
 
 ## Common First-Run Pitfalls
 
-* Using `-resume` unintentionally (skips updated steps)
-* Misnamed sample IDs in contrasts
-* Missing EBV contigs while EBV analysis is enabled
-* Insufficient disk space for intermediate files
-* Running bin-size sweeps without accounting for increased runtime
-
----
+- Using `-resume` unintentionally (skips updated steps)
+- Misnamed sample IDs in contrasts
+- Missing EBV contigs while EBV analysis is enabled
+- Insufficient disk space for intermediate files
+- Running bin-size sweeps without accounting for increased runtime
 
 ## Next Steps
 
 After completing a successful run:
 
-* Review output structure
-* Inspect differential statistics and plots
-* Consult the **Configuration Guide** to fine-tune parameters
-* Proceed to **Pipeline Modules** for a deeper understanding of each stage
+- Review output structure
+- Inspect differential statistics and plots
+- Consult the **Configuration Guide** to fine-tune parameters
+- Proceed to **Pipeline Modules** for a deeper understanding of each stage
 
+---
 
+**Next:** See [Configuration Guide](configuration.md) for detailed parameter explanations.
