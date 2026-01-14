@@ -72,24 +72,37 @@ Validation & Sensitivity Analyses
 ```
 
 ---
-
 ## Requirements
 
-### Software
+I-SAGE is designed to run on HPC systems and relies on a combination of workflow, bioinformatics, and Python-based tools.
 
-- Nextflow ≥ 22
-- Java ≥ 11
-- Python ≥ 3.9
+### Workflow & Runtime
+- **Nextflow** ≥ 22
+- **Java** ≥ 11
+- **Bash / core UNIX utilities**
+
+### Bioinformatics Tools
+The following tools must be available in the execution environment (typically via modules or Conda):
+
+- **samtools** — BAM processing, sorting, indexing
+- **pysam** — Python bindings for BAM/CRAM access
+- **bwa** (or equivalent aligner) — read alignment
+- **bedGraph / UCSC utilities** — bedGraph and bigWig handling
+
+Exact tool versions are managed via the active Nextflow profile (e.g. `eden_local`) and HPC environment.
+
+### Python
+- **Python** ≥ 3.9
 
 ### Python Packages
+- `numpy`
+- `pandas`
+- `scipy`
+- `matplotlib`
 
-- numpy
-- pandas
-- scipy
-- matplotlib
-
-**Note:** Packages are typically managed via environment/profile on HPC systems.
-
+> **Note:**  
+> I-SAGE assumes these tools are provided by the execution environment (HPC modules, Conda, or container).  
+> The pipeline does not install system-level dependencies automatically.
 ---
 
 ## Quick Start
