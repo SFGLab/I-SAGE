@@ -1,6 +1,6 @@
 // main.nf
-// I-BLESS Pipeline Month 2 + Month 3 Steps 1–4
-// FASTQ → QC → BAM → Break Calling → bedGraph/bigWig → normalized tracks → differential stats → validation
+// I-BLESS Pipeline Month 2 + Month 3 + Month 4 updates
+// FASTQ → QC → BAM → Break Calling → bedGraph/bigWig → normalized tracks → differential stats → validation → bin-size sweep summary
 // ---------------------------------------------------------
 
 nextflow.enable.dsl = 2
@@ -66,6 +66,32 @@ process BREAK_CALLING {
 
 
 // ---------------------------------------------------------
+// Helper: build per-bin-size samples TSV for stats module
+// Input:  (bin_size, [ \"sample\\tplus_bg\\tminus_bg\", ... ]) 
+// Output: (bin_size, samples.tsv)
+// ---------------------------------------------------------
+process MAKE_SAMPLES_TSV {
+    tag "bin_${bin_size}"
+    publishDir "${params.outdir}/stats/bin_${bin_size}", mode: 'copy'
+
+    input:
+    tuple val(bin_size), val(lines)
+
+    output:
+    tuple val(bin_size), file("samples_for_stats_bin_${bin_size}.tsv")
+
+    script:
+    // lines is a Groovy List<String>
+    def content = (lines as List).join("\n") + "\n"
+    """
+    cat > samples_for_stats_bin_${bin_size}.tsv <<'EOT'
+    ${content}
+EOT
+    """
+}
+
+
+// ---------------------------------------------------------
 // Workflow
 // ---------------------------------------------------------
 workflow {
@@ -90,152 +116,116 @@ workflow {
     // ---------------------------------------------------------
     if ( params.viz?.enabled ) {
 
-        // Bin-size sweep support: if viz.bin_sizes is provided, run viz→stats per bin size.
-        // Otherwise, fall back to viz.bin_size (or 500 if unset in config).
+        // Bin-size sweep support:
+        // - if viz.bin_sizes provided: run viz→stats/validation per bin size
+        // - else fall back to viz.bin_size (or 500 if unset)
         def bin_sizes = (params.viz?.bin_sizes ?: [ params.viz?.bin_size ?: 500 ]) as List
+        Channel
+            .fromList(bin_sizes.collect { it as int })
+            .set { bin_sizes_ch }
 
-        // Hold combined outputs across all bin sizes so we can summarize later
-        def all_diff_out = Channel.empty()
-
-        // ---------------------------------------------------------
-        // For each bin size: Step 1 (tracks) → IGV sessions → Step 2 (normalize) → Stats/Validation
-        // ---------------------------------------------------------
-        bin_sizes.each { bs ->
-
-            // Step 1: create raw binned bedGraphs + bigWigs + total_dsb.txt
-            def breaks_with_bin = breaks_out.map { sample_id, breaks_bed ->
+        // Fan-out breaks across bin sizes WITHOUT re-invoking the module in a loop
+        def breaks_with_bin = breaks_out
+            .cross(bin_sizes_ch)
+            .map { br, bs ->
+                def (sample_id, breaks_bed) = br
                 tuple(bs as int, sample_id, breaks_bed)
             }
 
-            def tracks_out = BREAKS_TO_TRACKS(breaks_with_bin, file(params.genome_fasta))
+        // Step 1: create raw binned bedGraphs + bigWigs + total_dsb.txt
+        def tracks_out = BREAKS_TO_TRACKS(breaks_with_bin, file(params.genome_fasta))
+        /*
+          tracks_out tuple:
+          (bin_size,
+           sample_id,
+           plus.bedGraph, minus.bedGraph,
+           plus.bw, minus.bw,
+           total_dsb.txt)
+        */
 
-            /*
-              tracks_out tuple:
-              (bin_size,
-               sample_id,
-               plus.bedGraph, minus.bedGraph,
-               plus.bw, minus.bw,
-               total_dsb.txt)
-            */
-
-            // IGV sessions (raw tracks)
-            def igv_in = tracks_out.map { bin_size, sample_id, plus_bg, minus_bg, plus_bw, minus_bw, total_txt ->
-                tuple(bin_size, sample_id, plus_bw, minus_bw)
-            }
-            MAKE_IGV_SESSION(igv_in)
-
-            // Step 2: normalize bedGraphs and create normalized bigWigs
-            def norm_in = tracks_out.map { bin_size, sample_id, plus_bg, minus_bg, plus_bw, minus_bw, total_txt ->
-                tuple(bin_size, sample_id, plus_bg, minus_bg, total_txt)
-            }
-            NORMALIZE_TRACKS(norm_in, file(params.genome_fasta))
-
-            // ---------------------------------------------------------
-            // Month 3 Step 3 + Step 4 (Stats + Validation)
-            // ---------------------------------------------------------
-            if ( params.stats?.enabled ) {
-
-                // Build samples TSV (raw bedGraphs) for this bin size
-                def samples_tsv_ch = tracks_out
-                    .map { bin_size, sample_id, plus_bg, minus_bg, plus_bw, minus_bw, total_txt ->
-                        tuple(sample_id, plus_bg, minus_bg)
-                    }
-                    .collectFile(
-                        name: "samples_for_stats_bin_${bs}.tsv",
-                        storeDir: "${params.outdir}/stats/bin_${bs}",
-                        newLine: true
-                    ) { row ->
-                        "${row[0]}\t${row[1]}\t${row[2]}"
-                    }
-
-                // Build a channel of tuples: (bin_size, samples_tsv, contrast_name, contrast_spec)
-                def contrasts = params.stats.contrasts ?: []
-
-                /*
-                  Replicate-aware contrast specification (backwards compatible):
-                    - legacy:
-                        contrasts:
-                          - name: "APH_vs_DMSO_rep1"
-                            case: ["SAMPLE_A"]
-                            control: ["SAMPLE_B"]
-                    - condition-based (recommended):
-                        conditions:
-                          APH: ["APH_rep1", "APH_rep2"]
-                          DMSO: ["DMSO_rep1", "DMSO_rep2"]
-                        contrasts:
-                          - name: "APH_vs_DMSO"
-                            case_condition: "APH"
-                            control_condition: "DMSO"
-
-                  Also supported (shorthand):
-                    case: "APH"  control: "DMSO"  (if those keys exist in conditions)
-                */
-                def conditions = params.stats.conditions ?: [:]
-
-                def resolve_group = { obj ->
-                    if (obj == null) {
-                        return []
-                    }
-                    // If it's already a list of sample IDs
-                    if (obj instanceof List) {
-                        return obj as List
-                    }
-                    // If it's a string, treat it as a condition name if present; otherwise a single sample ID
-                    def s = obj as String
-                    if (conditions.containsKey(s)) {
-                        return (conditions[s] as List)
-                    }
-                    return [s]
-                }
-
-                def stats_in_ch = samples_tsv_ch.flatMap { samples_tsv ->
-                    contrasts.collect { c ->
-                        def cname = c.name as String
-                        def case_list = []
-                        def ctrl_list = []
-
-                        if (c.containsKey('case_condition') || c.containsKey('control_condition')) {
-                            def cc = c.case_condition as String
-                            def ct = c.control_condition as String
-                            if (!conditions.containsKey(cc) || !conditions.containsKey(ct)) {
-                                throw new IllegalArgumentException("Unknown condition key in contrast '${cname}': case_condition='${cc}', control_condition='${ct}'. Available: ${conditions.keySet()}")
-                            }
-                            case_list = (conditions[cc] as List)
-                            ctrl_list = (conditions[ct] as List)
-                        } else {
-                            case_list = resolve_group(c.case)
-                            ctrl_list = resolve_group(c.control)
-                        }
-
-                        if (!case_list || !ctrl_list) {
-                            throw new IllegalArgumentException("Contrast '${cname}' must define non-empty case and control groups")
-                        }
-
-                        def case_ids = (case_list as List).join(',')
-                        def ctrl_ids = (ctrl_list as List).join(',')
-                        def spec = "${cname}:${case_ids}:${ctrl_ids}"
-                        tuple(bs as int, samples_tsv, cname, spec)
-                    }
-                }
-
-                // Step 3: differential testing (runs once per contrast)
-                def diff_out = DIFF_BREAKS(stats_in_ch)
-                all_diff_out = all_diff_out.mix(diff_out)
-
-                // Step 4: validation (optional; runs once per contrast)
-                if ( params.validation?.enabled ) {
-                    VALIDATE_DIFF(stats_in_ch)
-                }
-            }
+        // IGV sessions (raw tracks)
+        def igv_in = tracks_out.map { bin_size, sample_id, plus_bg, minus_bg, plus_bw, minus_bw, total_txt ->
+            tuple(bin_size, sample_id, plus_bw, minus_bw)
         }
+        MAKE_IGV_SESSION(igv_in)
 
-        // After the sweep finishes, write a single summary table across all bin sizes/contrasts
+        // Step 2: normalize bedGraphs and create normalized bigWigs
+        def norm_in = tracks_out.map { bin_size, sample_id, plus_bg, minus_bg, plus_bw, minus_bw, total_txt ->
+            tuple(bin_size, sample_id, plus_bg, minus_bg, total_txt)
+        }
+        NORMALIZE_TRACKS(norm_in, file(params.genome_fasta))
+
+        // ---------------------------------------------------------
+        // Month 3 Step 3 + Step 4 (Stats + Validation)
+        // ---------------------------------------------------------
         if ( params.stats?.enabled ) {
-            def summary_in = all_diff_out.map { bin_size, contrast_name, tsv, sig, sig_up, sig_down, volcano_png, volcano_pdf, ma_png, ma_pdf, summary_txt ->
+
+            // Build per-bin-size samples TSVs from raw bedGraphs
+            def samples_lines_grouped = tracks_out
+                .map { bin_size, sample_id, plus_bg, minus_bg, plus_bw, minus_bw, total_txt ->
+                    tuple(bin_size, "${sample_id}\t${plus_bg}\t${minus_bg}")
+                }
+                .groupTuple(by: 0)  // (bin_size, [line1, line2, ...])
+
+            def samples_tsv_by_bin = MAKE_SAMPLES_TSV(samples_lines_grouped) // (bin_size, samples.tsv)
+
+            // Build a channel of tuples: (bin_size, samples_tsv, contrast_name, contrast_spec)
+            def contrasts  = params.stats.contrasts ?: []
+            def conditions = params.stats.conditions ?: [:]
+
+            def resolve_group = { obj ->
+                if (obj == null) return []
+                if (obj instanceof List) return obj as List
+                def s = obj as String
+                if (conditions.containsKey(s)) return (conditions[s] as List)
+                return [s]
+            }
+
+            def stats_in_ch = samples_tsv_by_bin.flatMap { bs, samples_tsv ->
+                contrasts.collect { c ->
+                    def cname = c.name as String
+                    def case_list = []
+                    def ctrl_list = []
+
+                    if (c.containsKey('case_condition') || c.containsKey('control_condition')) {
+                        def cc = c.case_condition as String
+                        def ct = c.control_condition as String
+                        if (!conditions.containsKey(cc) || !conditions.containsKey(ct)) {
+                            throw new IllegalArgumentException(
+                                "Unknown condition key in contrast '${cname}': case_condition='${cc}', control_condition='${ct}'. Available: ${conditions.keySet()}"
+                            )
+                        }
+                        case_list = (conditions[cc] as List)
+                        ctrl_list = (conditions[ct] as List)
+                    } else {
+                        case_list = resolve_group(c.case)
+                        ctrl_list = resolve_group(c.control)
+                    }
+
+                    if (!case_list || !ctrl_list) {
+                        throw new IllegalArgumentException("Contrast '${cname}' must define non-empty case and control groups")
+                    }
+
+                    def case_ids = (case_list as List).join(',')
+                    def ctrl_ids = (ctrl_list as List).join(',')
+                    def spec = "${cname}:${case_ids}:${ctrl_ids}"
+                    tuple(bs as int, samples_tsv, cname, spec)
+                }
+            }
+
+            // Step 3: differential testing (once; runs per (bin_size, contrast) tuple)
+            def diff_out = DIFF_BREAKS(stats_in_ch)
+
+            // Step 4: validation (optional; runs per (bin_size, contrast) tuple)
+            if ( params.validation?.enabled ) {
+                VALIDATE_DIFF(stats_in_ch)
+            }
+
+            // After stats finish, write a single summary table across all bin sizes/contrasts
+            def summary_in = diff_out.map { bin_size, contrast_name, tsv, sig, sig_up, sig_down, volcano_png, volcano_pdf, ma_png, ma_pdf, summary_txt ->
                 tuple(bin_size, contrast_name, summary_txt)
             }
 
-            // Build a single manifest TSV to aggregate in one process
             def manifest_ch = summary_in.collectFile(
                 name: "bin_sweep_inputs.tsv",
                 storeDir: "${params.outdir}/stats",
